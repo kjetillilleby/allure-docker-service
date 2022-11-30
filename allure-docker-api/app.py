@@ -23,8 +23,8 @@ from flask.logging import create_logger
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_jwt_extended import (
     JWTManager, jwt_required, create_access_token, create_refresh_token, current_user,
-    get_jwt_identity, verify_jwt_in_request, jwt_refresh_token_required, get_raw_jwt,
-    set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_refresh_token_in_request
+    get_jwt_identity, verify_jwt_in_request, get_jwt,
+    set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 )
 
 dictConfig({
@@ -66,8 +66,8 @@ app = Flask(__name__) #pylint: disable=invalid-name
 
 LOGGER = create_logger(app)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-app.config['JWT_BLACKLIST_ENABLED'] = True
-app.config['JWT_BLACKLIST_TOKEN_CHECKS'] = ['access', 'refresh']
+app.config['JWT_BLOCKLIST_ENABLED'] = True
+app.config['JWT_BLOCKLIST_TOKEN_CHECKS'] = ['access', 'refresh']
 app.config['JWT_TOKEN_LOCATION'] = ['cookies']
 app.config['JWT_COOKIE_CSRF_PROTECT'] = True
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = False
@@ -440,26 +440,26 @@ SWAGGERUI_BLUEPRINT = get_swaggerui_blueprint(
         'app_name': "Allure Docker Service"
     }
 )
-app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix="/")
-app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=NATIVE_PREFIX)
-app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=SWAGGER_ENDPOINT)
-app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=SWAGGER_ENDPOINT_PATH)
+app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix="/", name="root")
+app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=NATIVE_PREFIX, name="prefix")
+app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=SWAGGER_ENDPOINT, name="endpoint")
+app.register_blueprint(SWAGGERUI_BLUEPRINT, url_prefix=SWAGGER_ENDPOINT_PATH, name="path")
 if URL_PREFIX:
     app.register_blueprint(SWAGGERUI_BLUEPRINT,
-        url_prefix='{}{}'.format(NATIVE_PREFIX, SWAGGER_ENDPOINT))
+        url_prefix='{}{}'.format(NATIVE_PREFIX, SWAGGER_ENDPOINT), name="native")
 ### end swagger specific ###
 
 ### Security Section
 if ENABLE_SECURITY_LOGIN:
     generate_security_swagger_spec()
 
-blacklist = set() #pylint: disable=invalid-name
+blocklist = set() #pylint: disable=invalid-name
 jwt = JWTManager(app) #pylint: disable=invalid-name
 
-@jwt.token_in_blacklist_loader
-def check_if_token_in_blacklist(decrypted_token):
+@jwt.token_in_blocklist_loader
+def check_if_token_in_blocklist(jwt_header, decrypted_token):
     jti = decrypted_token['jti']
-    return jti in blacklist
+    return jti in blocklist
 
 @jwt.invalid_token_loader
 def invalid_token_loader(msg):
@@ -509,12 +509,13 @@ def jwt_refresh_token_required(fn): #pylint: disable=invalid-name, function-rede
     def wrapper(*args, **kwargs):
         if ENABLE_SECURITY_LOGIN:
             if is_endpoint_protected(request.endpoint):
-                verify_jwt_refresh_token_in_request()
+                verify_jwt_in_request(refresh=True)
         return fn(*args, **kwargs)
     return wrapper
 
-@jwt.user_loader_callback_loader
-def user_loader_callback(identity):
+@jwt.user_lookup_loader
+def user_loader_callback(jwt_header, jwt_data):
+    identity=jwt_data['sub']
     if identity not in USERS_INFO:
         return None
     return UserAccess(
@@ -619,8 +620,8 @@ def logout_endpoint():
         resp = jsonify(body)
         return resp, 404
     try:
-        jti = get_raw_jwt()['jti']
-        blacklist.add(jti)
+        jti = get_jwt()['jti']
+        blocklist.add(jti)
         return jsonify({'meta_data': {'message' : 'Successfully logged out'}}), 200
     except Exception as ex:
         body = {
@@ -644,8 +645,8 @@ def logout_refresh_token_endpoint():
         resp = jsonify(body)
         return resp, 404
     try:
-        jti = get_raw_jwt()['jti']
-        blacklist.add(jti)
+        jti = get_jwt()['jti']
+        blocklist.add(jti)
         resp = jsonify({'meta_data': {'message' : 'Successfully logged out'}})
         unset_jwt_cookies(resp)
         return resp, 200
