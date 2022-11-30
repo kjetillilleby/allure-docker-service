@@ -10,7 +10,7 @@ if [ "$KEEP_HISTORY" == "TRUE" ] || [ "$KEEP_HISTORY" == "true" ] || [ "$KEEP_HI
 	mkdir -p $PROJECT_RESULTS_HISTORY
 	if [ -e $PROJECT_LATEST_REPORT ]; then
 		echo "Copying history from previous results..."
-		cp --recursive --preserve=timestamps $PROJECT_LATEST_REPORT/. $PROJECT_RESULTS_HISTORY
+		cp -r -p $PROJECT_LATEST_REPORT/. $PROJECT_RESULTS_HISTORY
 	fi
 else
 	if [ -d $PROJECT_RESULTS_HISTORY ]; then

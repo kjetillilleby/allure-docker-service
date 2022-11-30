@@ -9,6 +9,6 @@ if [ "$(ls -A $PROJECT_LATEST_REPORT | wc -l)" != "0" ]; then
     echo "Storing report history for PROJECT_ID: $PROJECT_ID"
     NEW_REPORT_DIRECTORY=$PROJECT_REPORTS_DIRECTORY/$BUILD_ORDER
     mkdir -p $NEW_REPORT_DIRECTORY
-    cp --recursive --preserve=timestamps $PROJECT_LATEST_REPORT/* $NEW_REPORT_DIRECTORY/
+    cp -r -p $PROJECT_LATEST_REPORT/* $NEW_REPORT_DIRECTORY/
     echo "BUILD_ORDER:$BUILD_ORDER"
 fi
